@@ -38,7 +38,15 @@ etfs <- tribble(
   # --- EM Bond ETFs ---
   "Bond",           "EM Sov USD",   "IUS7.DE",
   "Bond",           "EM Local",     "IUSP.DE",
-  "Bond",           "EM Corp",      "IS0Q.DE"
+  "Bond",           "EM Corp",      "IS0Q.DE",
+  "Bond",           "EU Gov 1-3y",  "IBGS.MI",
+  "Bond",           "EU Gov 7-10y", "IBGM.MI",
+  "Bond",           "US Tre 1-3y",  "IBTS.MI",
+  "Bond",           "US Tre 7-10y", "IUSM.DE",
+  "Bond",           "EU Inflation", "IBCI.DE",
+  "Bond",           "EU Corp IG",   "EUN5.DE",
+  "Bond",           "US Corp HY",   "EUNW.DE"
+
 ) %>%
   distinct(yf_ticker, .keep_all = TRUE) %>%
   mutate(asset = str_replace(yf_ticker, "\\.[A-Za-z]+$", ""))  # drop '.XX' suffix

@@ -19,8 +19,9 @@ source("APIKey.R")
 # and designed for low correlation and high EM-relevance.
 fred_series <- c(
 
-  usd_em_index      = "DTWEXEMEGS",
-  term_spread_10y2y = "T10Y2Y",
+  #usd_em_index      = "DTWEXEMEGS",
+  usd_eur_rate      = "DEXUSEU",
+  term_spread_10y3m = "T10Y3M",
   yield_10y         = "DGS10",
   cpi_headline      = "CPIAUCSL",
   vix_index         = "VIXCLS",
@@ -48,7 +49,7 @@ get_fred_data <- function(named_series, start_date = "2000-01-01", freq = NULL) 
 # 6. Inflation Shock (Man Group Theme)
 yf_futures <- tibble::tibble(
   yf = "^SPX",
-  series = "SPX"   # Clean names for the series
+  series = "SPX"  # Clean names for the series
 )
 
 get_yahoo_close <- function(tickers_tbl) {
@@ -86,7 +87,8 @@ macro_wide <- macro_long %>%
   dplyr::arrange(date)
 
 
-# Done:
-#   - macro_long: date, series, value, source (FRED or YF)
-#   - macro_wide: date + one column per series (Core 6)
 
+
+head(macro_test$date)
+macro_test <- na.omit(macro_wide)
+View(macro_wide)

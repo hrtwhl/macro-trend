@@ -1,9 +1,8 @@
 # Momentum Strategy with Macro Regime Overlay
 
-Building a simple price momentum strategy with a macro regime overlay based on [Mulliner et. al (2025)](https://www.man.com/insights/regimes-systematic-models-power-of-prediction) and [Macro Trend](https://substack.com/home/post/p-174152862) by Moritz Heiden. 
+Building a simple price momentum strategy with a macro regime overlay based on [Mulliner et. al (2025)](https://www.man.com/insights/regimes-systematic-models-power-of-prediction) and [Macro Trend](https://substack.com/home/post/p-174152862) by Moritz Heiden.
 
-README will be updated as soon as I'm done with coding. 
-
+README will be updated as soon as I'm done with coding.
 
 ## Asset Universe
 
@@ -31,7 +30,7 @@ README will be updated as soon as I'm done with coding.
 | Region | ETF | TER | Acc/Dis | ISIN | YF Ticker | Data Since | OeKB |
 |---------|---------|---------|---------|---------|---------|---------|---------|
 | EM broad | iShares Core MSCI Emerging Markets IMI UCITS ETF (Acc) | 0.18% | Acc | IE00BKM4GZ66 | EUNM.DE | 10/20/2009 | Yes |
-| EM Asia | iShares MSCI EM Asia UCITS ETF (Acc) | 0.20% | Acc | IE00B5L8K969 | CSEMAS.MI | 8/10/2010 | Yes |
+| EM Asia | iShares MSCI EM Asia UCITS ETF (Acc) | 0.20% | Acc | IE00B5L8K969 | CEBL.DE | 2/28/2011 | Yes |
 | EM Latin America | iShares MSCI EM Latin America UCITS ETF (Dist) | 0.20% | Dis | IE00B27YCK28 | IUSC.DE | 3/27/2008 | Yes |
 | EM Small Cap | iShares MSCI Emerging Markets Small Cap UCITS ETF | 0.74% | Dis | IE00B3F81G20 | EUNI.DE | 3/5/2009 | Yes |
 
@@ -49,3 +48,15 @@ README will be updated as soon as I'm done with coding.
 | EM Sovereign USD Bonds | iShares J.P. Morgan USD Emerging Markets Bond UCITS ETF (Dist) | 0.45% | Dis | IE00B2NPKV68 | IUS7.DE | 3/20/2009 | Yes |
 | EM Local Currency Bonds | iShares J.P. Morgan EM Local Govt Bond ETF | 0.50% | Dis | IE00B5M4WH52 | IUSP.DE | 8/15/2011 | Yes |
 | EM Corporate Bonds | iShares J.P. Morgan USD EM Corporate Bond UCITS ETF (Dist) | 0.50% | Dis | IE00B6TLBW47 | IS0Q.DE | 4/17/2012 | Yes |
+
+### DM Bond ETFs
+
+| Factor | ETF | TER | Acc/Dis | ISIN | YF Ticker | Data Since | OeKB |
+|---------|---------|---------|---------|---------|---------|---------|---------|
+| EUR Short Duration | Euro Government Bond 1-3yr UCITS ETF (Dist) | 0.15% | Dis | IE00B14X4Q57 | IBGS.MI | 1/2/2008 | Yes |
+| EUR Duration Play | iShares Euro Government Bond 7-10yr UCITS ETF EUR (Dist) | 0.15% | Dis | IE00B1FZS806 | IBGM.MI | 1/2/2008 | Yes |
+| USD Short Duration | iShares \$ Treasury Bond 1-3yr UCITS ETF | 0.07% | Dis | IE00B14X4S71 | IBTS.MI | 1/1/2008 | Yes |
+| USD Duration Play | iShares USD Treasury Bond 7-10yr UCITS ETF (Dist) | 0.07% | Dis | IE00B1FZS798 | IUSM.DE | 2/3/2009 | Yes |
+| Inflation Bond | iShares Euro Inflation Linked Government Bond UCITS ETF | 0.09% | Acc | IE00B0M62X26 | IBCI.DE | 1/14/2009 | Yes |
+| EUR IG Bonds | iShares Core Euro Corporate Bond UCITS ETF (Dist) | 0.09% | Dis | IE00B3F81R35 | EUN5.DE | 5/26/2009 | Yes |
+| USD HY Bonds | iShares EUR High Yield Corporate Bond UCITS ETF EUR (Dist) | 0.50% | Dis | IE00B66F4759 | EUNW.DE | 12/15/2010 | Yes |

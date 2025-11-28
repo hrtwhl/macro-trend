@@ -1,11 +1,8 @@
 # -------------------------------------------------------------------------
 # Bloomberg Index Downloader (EUR Conversion)
 # -------------------------------------------------------------------------
-
-# 1. Load necessary libraries
-# If you don't have Rblpapi, install it: install.packages("Rblpapi")
 library(Rblpapi)
-library(dplyr) # For easier data manipulation
+library(dplyr) 
 
 # 2. Connect to Bloomberg
 # Note: A Bloomberg Terminal must be running and logged in on this machine.
@@ -46,7 +43,7 @@ tickers <- c(
 print(paste("Downloading", length(tickers), "ETFs in EUR..."))
 
 # 4. Define Download Parameters
-start_date <- as.Date("2020-01-01") 
+start_date <- as.Date("2000-01-01") 
 end_date   <- Sys.Date()
 field      <- "PX_LAST"             
 

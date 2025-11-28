@@ -20,7 +20,7 @@ library(stringr)
 # assets_long  <- readRDS("assets_long.rds") 
 # assets_wide  <- readRDS("assets_wide.rds") # Ensure this exists from Script 1
 
-BENCHMARK_TICKER <- "MSDEEEMN" # iShares MSCI EM
+BENCHMARK_TICKER <- "MIMUEMRN" # iShares MSCI EM
 
 # Portfolio Limits (Strict)
 MAX_SINGLE_ASSET   <- 0.20
@@ -30,8 +30,8 @@ MAX_TOTAL_EXPOSURE <- 1.00 # The hard ceiling
 
 # Helper: Map Tickers to Class
 get_asset_class <- function(tickers) {
-  bond_tickers <- c("IUS7", "IUSP", "IS0Q", "IBGS", "IBGM", 
-                    "IBTS", "IUSM", "IBCI", "EUN5", "EUNW")
+  bond_tickers <- c("JPEICORE", "GBIE1001", "BCEX6T", "BCEX4T", "IDCOT7", 
+                    "BEIG1T", "LECPTREU", "IBOXXMJA")
   ifelse(tickers %in% bond_tickers, "Bond", "Equity")
 }
 

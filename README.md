@@ -1,6 +1,6 @@
 # Momentum Strategy with Macro Regime Overlay
 
-Building a simple price momentum strategy with a macro regime overlay based on [Mulliner et. al (2025)](https://www.man.com/insights/regimes-systematic-models-power-of-prediction) and [Macro Trend](https://substack.com/home/post/p-174152862) by Moritz Heiden.
+Building a simple macro regime strategy for emerging markets based on [Mulliner et. al (2025)](https://www.man.com/insights/regimes-systematic-models-power-of-prediction).
 
 README will be updated as soon as I'm done with coding.
 

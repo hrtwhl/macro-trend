@@ -46,7 +46,7 @@ tickers <- c(
 print(paste("Downloading", length(tickers), "indices in EUR..."))
 
 # 4. Define Download Parameters
-start_date <- as.Date("2020-01-01") 
+start_date <- as.Date("2000-01-01") 
 end_date   <- Sys.Date()
 field      <- "PX_LAST"             
 

@@ -5,7 +5,7 @@
 # 1. Load necessary libraries
 # If you don't have Rblpapi, install it: install.packages("Rblpapi")
 library(Rblpapi)
-library(dplyr) # For easier data manipulation
+library(dplyr) 
 
 # 2. Connect to Bloomberg
 # Note: A Bloomberg Terminal must be running and logged in on this machine.

@@ -51,3 +51,23 @@ crash_idx  <- which.min(abs(index(weight_xts_check) - crash_date))
 
 print(paste("Allocation around Lehman Crash (", crash_date, "):"))
 print(weight_xts_check[(crash_idx-2):(crash_idx+2), ])
+
+
+data <- read.csv("EM_Indices_EUR.csv")
+data$Dates <- as.Date(data$Dates)
+
+colnames(data)
+
+data <- data |> 
+  select(-MXMY.Index) |> 
+  na.omit()
+
+
+
+
+
+data |> ggplot(aes(x=Dates)) +
+  geom_line(aes(y=BCEX4T.Index)) +
+  theme_minimal()
+
+colnames(data)

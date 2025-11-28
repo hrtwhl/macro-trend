@@ -89,6 +89,3 @@ macro_wide <- macro_long %>%
 
 
 
-head(macro_test$date)
-macro_test <- na.omit(macro_wide)
-View(macro_wide)

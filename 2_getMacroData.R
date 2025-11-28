@@ -88,4 +88,59 @@ macro_wide <- macro_long %>%
 
 
 
+# =========================================================
+# =========================================================
+# =========================================================
+# Lag macro variables
+# =========================================================
+# =========================================================
+# =========================================================
 
+# =========================================================
+# DOWNLOAD & BUILD FINAL TABLES (WITH LAG CORRECTION)
+# =========================================================
+# 1) FRED (4 series)
+fred_long <- get_fred_data(fred_series, start_date = "2000-01-01")
+
+# 2) Yahoo futures (2 series)
+yf_long   <- get_yahoo_close(yf_futures)
+
+# 3) Combined LONG
+macro_long_raw <- bind_rows(fred_long, yf_long) %>%
+  arrange(series, date)
+
+# --- APPLY LAGS HERE (CORRECTED) ---
+# Logic: 
+# CPI is released mid-next month -> We only know Jan CPI in mid-Feb. 
+# Safe to trade on it end of Feb (Lag = 1 month).
+# China CLI often lags 1-2 months. Safe to trade end of Month+2 (Lag = 2 months).
+lags_vec <- c("cpi_headline" = 1, "china_cli" = 2)
+
+macro_long <- macro_long_raw %>%
+  group_by(series) %>%
+  mutate(
+    # 1. Lookup the lag. 
+    # as.character ensures we match the name correctly.
+    # coalesce replaces any NA (not found) with 0.
+    lag_amount = coalesce(lags_vec[as.character(series)], 0),
+    
+    # 2. Apply lag. 
+    # If lag_amount is 0, lag(value, 0) simply returns the value (no change).
+    # This avoids the "n must be a whole number" error.
+    value = dplyr::lag(value, n = first(lag_amount))
+  ) %>%
+  select(-lag_amount) %>% # Clean up
+  ungroup() %>%
+  drop_na() # Drop the first few months that became NA due to lagging
+
+# 4) Combined WIDE (Standard pivot)
+macro_wide <- macro_long %>%
+  dplyr::select(date, series, value) %>%
+  dplyr::distinct() %>%
+  dplyr::group_by(date, series) %>%
+  dplyr::summarise(value = dplyr::last(value), .groups = "drop") %>%
+  tidyr::pivot_wider(names_from = series, values_from = value) %>%
+  dplyr::arrange(date)
+
+# Check
+cat("Lag applied. NAs removed. Start Date:", as.character(min(macro_wide$date)), "\n")

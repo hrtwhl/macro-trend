@@ -200,7 +200,7 @@ cat("Startdatum des Charts:", as.character(start(compare_xts)), "\n")
 # 4. Charts erstellen (Jetzt sollten beide gleichzeitig starten)
 charts.PerformanceSummary(compare_xts, 
                           main = "Regime Strategy vs Benchmark (Synchronisiert)",
-                          colorset = c("blue", "gray"),
+                          colorset = c("darkblue", "gray"),
                           lwd = 2)
 
 # 5. Statistiken berechnen (Nur für den aktiven Zeitraum)

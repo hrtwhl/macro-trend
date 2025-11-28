@@ -53,21 +53,44 @@ print(paste("Allocation around Lehman Crash (", crash_date, "):"))
 print(weight_xts_check[(crash_idx-2):(crash_idx+2), ])
 
 
-data <- read.csv("EM_Indices_EUR.csv")
+
+
+library(dplyr)
+library(ggplot2)
+
+data <- read.csv("EM_indices_EUR.csv")
 data$Dates <- as.Date(data$Dates)
 
 colnames(data)
 
 data <- data |> 
-  select(-MXMY.Index) |> 
+  na.omit()
+
+data2 <- read.csv("EM_ETFs_EUR.csv")
+data2$Dates <- as.Date(data2$Dates)
+
+colnames(data2)
+
+data2 <- data2 |> 
   na.omit()
 
 
+data_all <- merge(data, data2, by = "Dates")
+data_all <- na.omit(data_all)
+
+data_all_n <- data_all %>%
+  mutate(across(-Dates, 
+                ~ (.x - min(.x, na.rm = TRUE)) / (max(.x, na.rm = TRUE) - min(.x, na.rm = TRUE))
+  ))
 
 
 
-data |> ggplot(aes(x=Dates)) +
-  geom_line(aes(y=BCEX4T.Index)) +
+data_all_n |> ggplot(aes(x=Dates)) +
+  geom_line(aes(y=D5BI.GY.Equity), size = 0.2, color = "black") +
+  geom_line(aes(y=MXMX.Index), size = 0.2, color = "grey80") +
   theme_minimal()
 
 colnames(data)
+
+
+data_all <- merge()

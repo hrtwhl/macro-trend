@@ -26,10 +26,10 @@ etfs <- tribble(
   "Single Country", "Thailand",     "XCS4.DE",
   "Single Country", "Türkiye",      "ITKY.MI",
   "Single Country", "Philippines",  "XPQP.F",
-  "Single Country", "Vietnam",      "XFVT.DE",
+  #"Single Country", "Vietnam",      "XFVT.DE",
   # --- Regional / Broad EM Equity ETFs ---
   "Regional/Broad", "EM broad",     "EUNM.DE",
-  "Regional/Broad", "EM Asia",      "CSEMAS.MI",
+  "Regional/Broad", "EM Asia",      "CEBL.DE",
   "Regional/Broad", "EM LatAm",     "IUSC.DE",
   "Regional/Broad", "EM Small Cap", "EUNI.DE",
   # --- EM Factor / Style ETFs ---

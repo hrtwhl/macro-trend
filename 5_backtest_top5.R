@@ -206,11 +206,10 @@ charts.PerformanceSummary(compare_xts,
 # 5. Statistiken berechnen (Nur für den aktiven Zeitraum)
 stats <- rbind(
   table.AnnualizedReturns(compare_xts),
-  maxDrawdown(compare_xts),
-  SharpeRatio.annualized(compare_xts, Rf = 0)
+  maxDrawdown(compare_xts)
 )
 
-cat("\n--- PERFORMANCE SUMMARY (Synchronisiert) ---\n")
+cat("\n--- PERFORMANCE SUMMARY (Top 5) ---\n")
 print(round(stats, 4))
 
 # =========================================================

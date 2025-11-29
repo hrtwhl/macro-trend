@@ -213,40 +213,45 @@ cat("\n--- PERFORMANCE SUMMARY (Top 5) ---\n")
 print(round(stats, 4))
 
 # =========================================================
-# 6. ALLOCATION CHART (CORRECTED)
+# 6. ALLOCATION CHART (FIXED)
 # =========================================================
 
 # Wir schneiden die Gewichtungs-Matrix ab, damit sie zum Chart passt
 weight_matrix_xts <- xts(weight_matrix, order.by = all_dates)
-weight_matrix_sync <- weight_matrix_xts[paste0(first_signal_date, "/")]
+# Note: Ensure 'first_signal_date' is defined, otherwise use 'start_date' from section 5
+start_plot_date <- if(exists("first_signal_date")) first_signal_date else start_date
+weight_matrix_sync <- weight_matrix_xts[paste0(start_plot_date, "/")]
 
 # Aggregation für den Stacked Bar Chart
 ac_map <- get_asset_class(colnames(weight_matrix_sync))
 
-# ACHTUNG: rowSums erzeugt oft normale Vektoren ohne Datum.
-# Wir müssen sicherstellen, dass das Ergebnis ein xts bleibt.
-equity_vec <- rowSums(weight_matrix_sync[, ac_map == "Equity"])
-bond_vec   <- rowSums(weight_matrix_sync[, ac_map == "Bond"])
-cash_vec   <- 1 - (equity_vec + bond_vec)
+# FIX: Wrap rowSums in xts() to preserve the time index
+# We use 'na.rm=TRUE' just to be safe.
+equity_alloc <- xts(rowSums(weight_matrix_sync[, ac_map == "Equity"], na.rm=TRUE), order.by = index(weight_matrix_sync))
+bond_alloc   <- xts(rowSums(weight_matrix_sync[, ac_map == "Bond"],   na.rm=TRUE), order.by = index(weight_matrix_sync))
 
-# Zusammenfügen und explizit als xts definieren mit dem korrekten Zeitindex
-alloc_df <- xts(cbind(Equity = equity_vec, Bond = bond_vec, Cash = cash_vec),
-                order.by = index(weight_matrix_sync))
+# Calculate Cash (Residual)
+cash_alloc   <- 1 - (equity_alloc + bond_alloc)
 
 # Kleine Bereinigungen (Floating point errors vermeiden)
-alloc_df[alloc_df < 0] <- 0 
-alloc_df[alloc_df > 1] <- 1
+cash_alloc[cash_alloc < 0] <- 0 
+cash_alloc[cash_alloc > 1] <- 1
 
-# Jetzt plotten (sollte nun funktionieren, da alloc_df ein xts ist)
+# Merge the three XTS objects
+alloc_df <- merge(equity_alloc, bond_alloc, cash_alloc)
+colnames(alloc_df) <- c("Equity", "Bond", "Cash")
+
+# Jetzt plotten
 chart.StackedBar(alloc_df[endpoints(alloc_df, "months")], 
-                 main = "Portfolio Allocation (Synchronisiert)",
-                 colorset = c("green", "orange", "lightgray"),
+                 main = "Portfolio Allocation (Top 5 - Synchronized)",
+                 colorset = c("darkgreen", "orange", "lightgray"),
                  ylab = "Allocation", 
-                 ylim = c(0, 1.0))
+                 ylim = c(0, 1.0),
+                 border=NA)
 
 # Current Allocation Check
 cat("\n--- CURRENT ALLOCATION (Strict 100% Cap) ---\n")
 latest_w <- coredata(weight_matrix_sync)[nrow(weight_matrix_sync), ]
-latest_w <- latest_w[latest_w > 0]
+latest_w <- latest_w[latest_w > 0.001]
 print(round(latest_w, 3))
 cat("Total Allocation:", sum(latest_w), "\n")

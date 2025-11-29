@@ -333,3 +333,47 @@ barplot(height = df_anti$Sharpe, names.arg = df_anti$Type,
         main = "Method Validation: Similarity vs Dissimilarity",
         ylab = "Sharpe Ratio",
         col = c("blue", "gray"))
+
+
+
+
+#-----------
+# DIAGNOSTIC: Are we trading on bad matches?
+
+# 1. Extract the distances of the neighbors used for signals
+# We look at the 'regime_distances' object (from Script 3)
+# and filter for the dates that were actually selected as 'top neighbors' in Script 4.
+
+library(ggplot2)
+
+# Get the list of all analysis dates
+analysis_dates <- unique(signals_long$date)
+dist_history <- numeric(length(analysis_dates))
+
+for(i in seq_along(analysis_dates)) {
+  d <- analysis_dates[i]
+  
+  # Find the neighbors used for this date
+  # (We used Top 20% in Script 4, so let's replicate that logic)
+  subset_dist <- regime_distances %>% 
+    filter(Analysis_Date == d) %>%
+    arrange(Distance)
+  
+  n_neighbors <- ceiling(nrow(subset_dist) * 0.20)
+  
+  # Calculate average distance of these top neighbors
+  avg_dist <- mean(head(subset_dist$Distance, n_neighbors))
+  dist_history[i] <- avg_dist
+}
+
+# Create a dataframe for plotting
+dist_df <- data.frame(Date = analysis_dates, AvgDistance = dist_history)
+
+# Plot
+ggplot(dist_df, aes(x = Date, y = AvgDistance)) +
+  geom_line(color = "darkred") +
+  geom_hline(yintercept = quantile(dist_df$AvgDistance, 0.90), linetype="dashed") +
+  labs(title = "Confidence Check: How 'Far' were the Neighbors?",
+       subtitle = "Spikes indicate the model was forcing a match with dissimilar history.",
+       y = "Euclidean Distance (Lower is Better)") +
+  theme_minimal()

@@ -66,37 +66,6 @@ get_yahoo_close <- function(tickers_tbl) {
 }
 
 # =========================================================
-# DOWNLOAD & BUILD FINAL TABLES
-# =========================================================
-# 1) FRED (4 series)
-fred_long <- get_fred_data(fred_series, start_date = "2000-01-01")
-
-# 2) Yahoo futures (2 series)
-yf_long   <- get_yahoo_close(yf_futures)
-
-# 3) Combined LONG (this is your final macro_long with 6 series)
-macro_long <- bind_rows(fred_long, yf_long)
-
-# 4) Combined WIDE (this is your final macro_wide)
-macro_wide <- macro_long %>%
-  dplyr::select(date, series, value) %>%     # <- drop `source`
-  dplyr::distinct() %>%                      # guard against accidental dups
-  dplyr::group_by(date, series) %>%          # in case any ticker returns 2 rows/day
-  dplyr::summarise(value = dplyr::last(value), .groups = "drop") %>%
-  tidyr::pivot_wider(names_from = series, values_from = value) %>%
-  dplyr::arrange(date)
-
-
-
-# =========================================================
-# =========================================================
-# =========================================================
-# Lag macro variables
-# =========================================================
-# =========================================================
-# =========================================================
-
-# =========================================================
 # DOWNLOAD & BUILD FINAL TABLES (WITH LAG CORRECTION)
 # =========================================================
 # 1) FRED (4 series)

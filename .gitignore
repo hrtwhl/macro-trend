@@ -1,0 +1,4 @@
+# Ignore all Microsoft Office temporary lock files
+~$*
+*.pptx
+

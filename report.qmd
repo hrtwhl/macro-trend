@@ -1,0 +1,39 @@
+---
+title: "Regime based Asset Allocation"
+subtitle: "Monthly Update"
+date: 2025-12-01
+#author: "Wilhelm Hartung
+format: pdf
+---
+
+# Trade Sheet
+```{r}
+#| output: false
+#| echo: false
+#| eval: true
+#| cache: true
+
+source("1_getBBGData.R")
+source("2_getMacroData.R")
+source("3_regimeDetection.R")
+source("4_signalGeneration.R")
+source("5_backtest_top5.R")
+source("7_monthlyUpdate.R")
+```
+
+```{r}
+#| output: true
+#| echo: false      
+#| warning: false
+
+library(gt)
+
+trades %>%
+  gt() %>%
+  fmt_number(
+    columns = where(is.numeric),
+    decimals = 2
+  ) %>%
+  opt_stylize(style = 6, color = "gray")
+```
+

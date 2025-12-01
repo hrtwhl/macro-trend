@@ -17,7 +17,7 @@ library(lubridate)
 # 2. BLOOMBERG CSV IMPORT & CLEANING
 # ------------------------------------------------------------------------------
 # CSV einlesen
-bb_data_raw <- read_csv("EM_Indices_EUR.csv", show_col_types = FALSE)
+bb_data_raw <- read_csv("Data/EM_Indices_EUR.csv", show_col_types = FALSE)
 
 # Datensäuberung
 assets_wide <- bb_data_raw %>%
@@ -54,7 +54,5 @@ cat("Daten erfolgreich erstellt.\n")
 cat("Anzahl Assets:", ncol(assets_wide) - 1, "\n")
 cat("\nCheck Spaltennamen (sollte ohne 'Index' und ohne '.DE' sein):\n")
 print(head(colnames(assets_wide), 15))
-
-
 
 

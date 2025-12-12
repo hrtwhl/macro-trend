@@ -57,14 +57,14 @@ plot_global_score <- function(target_date, regime_df, top_pct = 0.20) {
               fill = "lightblue", alpha = 0.8, inherit.aes = FALSE) +
     
     # B. The Global Score Line
-    geom_line(linetype = "dashed", color = "black", size = 0.6) +
+    geom_line(color = "#003f5c", size = 1) +
     
     # C. Formatting
     scale_x_date(date_breaks = "5 years", date_labels = "%Y") +
-    labs(title = paste("Global Score / Regime Similarity for:", format(target_date, "%b %Y")),
+    labs(title = paste("Regime Similarity for:", format(target_date, "%b %Y")),
          subtitle = paste("Dashed Line = Euclidean Distance. Blue Bands = Top", 
                           top_pct*100, "% Nearest Neighbors."),
-         y = "Global Score (Euclidean Distance)", x = "Historical Date") +
+         y = "Euclidean Distance", x = NULL) +
     theme_minimal() +
     theme(panel.grid.minor = element_blank())
   

@@ -18,11 +18,17 @@ library(zoo) # for rolling functions
 # =========================================================
 # Variable Selection (The "Optimal 7" we decided on)
 # Ensure these exact names exist in your 'macro_wide'
-SELECTED_VARS <- c("SPX", "china_cli", "usd_eur_rate", #"usd_em_index", 
+SELECTED_VARS <- c("SPX", "china_cli", "dollar_index", 
                    "cpi_headline", "term_spread_10y3m", 
                    "yield_10y", "vix_index")
 
+SELECTED_VARS <- c("SPX", "dollar_index", 
+                   "term_spread_10y3m", 
+                   "yield_10y", "vix_index", "oil", "copper")
 
+
+
+names(macro_wide)
 # Parameters from Paper / Adaptation
 LOOKBACK_WINDOW_MONTHS <- 120 # 10 Years (Paper standard)
 MIN_HISTORY_MONTHS     <- 36  # Warmup period (To start trading in 2003, not 2010)
@@ -35,11 +41,16 @@ WINSORIZE_LIMIT        <- 3   # Cap Z-scores at +/- 3 (Paper standard)
 # We need monthly granularity (Last observation of the month).
 
 macro_monthly_raw <- macro_wide %>%
+  arrange(date) %>%
+  tidyr::fill(all_of(SELECTED_VARS), .direction = "down") %>%
   mutate(month_date = floor_date(date, "month")) %>%
   group_by(month_date) %>%
-  summarise(across(all_of(SELECTED_VARS), ~ last(na.omit(.))), .groups = "drop") %>%
+  summarise(across(all_of(SELECTED_VARS), dplyr::last), .groups = "drop") %>%
+  drop_na() %>%
   arrange(month_date)
 
+tail(macro_monthly_raw$month_date, 1)
+#View(macro_monthly_raw)
 # =========================================================
 # 3. TRANSFORMATION (12-Month Change)
 # =========================================================
@@ -49,17 +60,22 @@ macro_chg <- macro_monthly_raw %>%
   mutate(
     # Log Returns for Levels (Prices/Indices)
     SPX_chg      = log(SPX / lag(SPX, 12)),
-    china_cli_chg= china_cli - lag(china_cli, 12), # CLI is an index around 100, absolute diff is standard
-    usd_eur_chg   = log(usd_eur_rate / lag(usd_eur_rate, 12)),
-    cpi_chg      = log(cpi_headline / lag(cpi_headline, 12)),
+    #china_cli_chg= china_cli - lag(china_cli, 12), # CLI is an index around 100, absolute diff is standard
+    oil_chg   = log(oil / lag(oil, 12)),
+    copper_chg   = log(copper / lag(copper, 12)),
+    dollar_chg   = log(dollar_index / lag(dollar_index, 12)),
+    #cpi_chg      = log(cpi_headline / lag(cpi_headline, 12)),
     
     # Absolute Change for Rates/Spreads
     spread_chg   = term_spread_10y3m - lag(term_spread_10y3m, 12),
+    
     yield_chg    = yield_10y - lag(yield_10y, 12),
     vix_chg      = vix_index - lag(vix_index, 12)
   ) %>%
   select(month_date, ends_with("_chg")) %>%
   drop_na() # Drop the first 12 months of NAs
+
+
 
 # =========================================================
 # 4. NORMALIZATION (Rolling/Expanding Z-Score)
@@ -94,6 +110,7 @@ calc_hybrid_zscore <- function(x, min_per = 36, max_per = 120) {
 }
 
 # Apply to all columns
+
 macro_z <- macro_chg %>%
   mutate(across(ends_with("_chg"), ~ calc_hybrid_zscore(., MIN_HISTORY_MONTHS, LOOKBACK_WINDOW_MONTHS))) %>%
   drop_na() # Drop the warmup period
@@ -186,3 +203,5 @@ regime_distances %>%
 # Save the object for Script 4
 # saveRDS(regime_distances, "regime_distances.rds") 
 # saveRDS(macro_z, "macro_z_scores.rds")
+
+

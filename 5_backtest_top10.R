@@ -1,11 +1,10 @@
 # =========================================================
-# SCRIPT 5: BACKTEST & REPORTING (TOP 10 - CORRECTED)
+# SCRIPT 5: BACKTEST & REPORTING (TOP 10 - ROBUST FIX)
 # =========================================================
 # Strategy: "Top 10" Greedy Allocation
 # Fixes:
-# 1. Starts charts EXACTLY when strategy makes its first trade (skips warm-up).
-# 2. Synchronizes Benchmark comparison.
-# 3. Includes Log-Scale Chart & Corrected Calendar Table.
+# 1. Adds Safety Check (Intersect) to prevent "hallucinated" returns in 2000-2006.
+# 2. Uses Outer Join for correct synchronization.
 
 # Dependencies
 library(dplyr)
@@ -20,7 +19,7 @@ library(stringr)
 # =========================================================
 # 1. CONFIGURATION & DATA LOADING
 # =========================================================
-# Load objects (Ensure these exist in your environment)
+# Ensure these objects are loaded in your environment
 # signals_long <- readRDS("signals_long.rds")
 # assets_wide  <- readRDS("assets_wide.rds") 
 
@@ -73,7 +72,6 @@ for (i in seq_along(rebalance_dates)) {
   curr_date <- rebalance_dates[i]
   
   # 1. Get & Rank Signals
-  # Select positive signals and sort descending
   sig_subset <- signals_long %>%
     filter(date == curr_date) %>%
     mutate(asset_class = get_asset_class(asset)) %>%
@@ -130,7 +128,7 @@ for (i in seq_along(rebalance_dates)) {
 }
 
 # =========================================================
-# 4. DAILY BACKTEST ENGINE
+# 4. DAILY BACKTEST ENGINE (WITH SAFETY CHECK)
 # =========================================================
 all_dates <- index(daily_returns_xts)
 strat_returns <- numeric(length(all_dates))
@@ -154,8 +152,13 @@ for (d in 1:length(all_dates)) {
     if (as.numeric(latest_rebal) != last_rebal_idx) {
       target_w <- weights_history[[as.character(latest_rebal)]]
       
+      # --- FIX START: Safety Check ---
+      # Only assign weights to assets that actually exist in the price table
       current_weights[] <- 0 
-      current_weights[names(target_w)] <- target_w
+      valid_assets <- intersect(names(target_w), names(current_weights))
+      current_weights[valid_assets] <- target_w[valid_assets]
+      # --- FIX END ---
+      
       last_rebal_idx <- as.numeric(latest_rebal)
     }
   }
@@ -164,7 +167,7 @@ for (d in 1:length(all_dates)) {
   
   # Calc Daily Return
   day_rets <- daily_returns_xts[d, ]
-  day_rets[is.na(day_rets)] <- 0 # Treat missing/holiday as 0
+  day_rets[is.na(day_rets)] <- 0 
   
   strat_returns[d] <- sum(day_rets * current_weights)
 }
@@ -173,23 +176,20 @@ strat_xts <- xts(strat_returns, order.by = all_dates)
 colnames(strat_xts) <- "Regime_Top10"
 
 # =========================================================
-# 5. REPORTING: DYNAMIC START DATE (THE FIX)
+# 5. REPORTING
 # =========================================================
 
-# 1. Merge Strategy & Benchmark (Outer Join to capture all data)
+# 1. Merge Strategy & Benchmark (Outer Join)
 compare_xts_full <- merge(strat_xts, bench_ret, join = "outer")
 compare_xts_full[is.na(compare_xts_full)] <- 0
 
 # 2. FIND ACTUAL START DATE (Skip the Flat/Warm-up Period)
-# Look for the first non-zero return in the strategy column "Regime_Top10"
 non_zero_idx <- which(compare_xts_full[, "Regime_Top10"] != 0)
 
 if (length(non_zero_idx) > 0) {
-  # Start exactly at the first trade
   start_index_num   <- non_zero_idx[1]
   actual_start_date <- index(compare_xts_full)[start_index_num]
 } else {
-  # Fallback if strategy never trades
   actual_start_date <- first(index(compare_xts_full))
   warning("Strategy is flat (0%) for the entire history!")
 }
@@ -199,9 +199,9 @@ cat(paste("Strategy Warm-up Complete. Actual Trading Starts:", actual_start_date
 # 3. TRIM DATA to this Start Date
 compare_xts <- compare_xts_full[paste0(actual_start_date, "/")]
 
-# 4. Standard Chart (Linear)
+# 4. Standard Chart
 charts.PerformanceSummary(compare_xts, 
-                          main = "Regime Top10 vs Benchmark (Synchronized)",
+                          main = "Regime Top10 vs Benchmark",
                           colorset = c("darkblue", "gray"),
                           lwd = 2)
 
@@ -226,9 +226,8 @@ p_log <- ggplot(plot_data, aes(x = date, y = Wealth_Index, color = Series)) +
 
 print(p_log)
 
-# 6. Calendar Table (Manual Aggregation Fix)
+# 6. Calendar Table
 monthly_stats <- apply.monthly(compare_xts, Return.cumulative)
-
 cat("\n--- CALENDAR RETURNS ---\n")
 print(table.CalendarReturns(monthly_stats))
 
@@ -237,24 +236,19 @@ print(round(rbind(table.AnnualizedReturns(compare_xts),
                   maxDrawdown(compare_xts)), 4))
 
 # =========================================================
-# 6. ALLOCATION CHART (SYNCHRONIZED)
+# 6. ALLOCATION CHART
 # =========================================================
-
-# 1. Trim Weights to match the SAME Start Date as the Chart
 weight_matrix_xts <- xts(weight_matrix, order.by = all_dates)
 weight_matrix_sync <- weight_matrix_xts[paste0(actual_start_date, "/")]
 
-# 2. Aggregate
 ac_map <- get_asset_class(colnames(weight_matrix_sync))
 equity_alloc <- xts(rowSums(weight_matrix_sync[, ac_map == "Equity"], na.rm=TRUE), order.by = index(weight_matrix_sync))
 bond_alloc   <- xts(rowSums(weight_matrix_sync[, ac_map == "Bond"],   na.rm=TRUE), order.by = index(weight_matrix_sync))
 cash_alloc   <- 1 - (equity_alloc + bond_alloc)
 
-# Clean
 cash_alloc[cash_alloc < 0] <- 0 
 cash_alloc[cash_alloc > 1] <- 1
 
-# 3. Plot
 alloc_df <- merge(equity_alloc, bond_alloc, cash_alloc)
 colnames(alloc_df) <- c("Equity", "Bond", "Cash")
 
@@ -264,7 +258,3 @@ chart.StackedBar(alloc_df[endpoints(alloc_df, "months")],
                  ylab = "Allocation", 
                  ylim = c(0, 1.0),
                  border=NA)
-
-cat("\n--- LATEST ALLOCATION ---\n")
-latest_w <- coredata(weight_matrix_sync)[nrow(weight_matrix_sync), ]
-print(round(latest_w[latest_w > 0.001], 3))

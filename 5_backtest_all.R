@@ -1,11 +1,15 @@
 # =========================================================
 # SCRIPT 5: BACKTEST & REPORTING (OPTION C - BREADTH)
 # =========================================================
-# Strategy: Equal Weight all Positive Signals (Regime Breadth)
+# Strategy: Equal Weight all Positive Signals
+# Logic: 
+#   - Invest in ALL assets with Expected Return > 0.
+#   - Weight = 1 / N (Subject to constraints).
+#   - Dynamic Start Date & Robust Reporting applied.
 # Constraints: 
-# 1. Max Single Asset: 20% (at investment time)
-# 2. Max Bond Allocation: 40%
-# 3. No Shorts, No Leverage (Max 100% Total)
+#   1. Max Single Asset: 20%
+#   2. Max Bond Allocation: 40%
+#   3. No Shorts, No Leverage.
 
 # Dependencies
 library(dplyr)
@@ -13,52 +17,51 @@ library(tidyr)
 library(lubridate)
 library(xts)
 library(PerformanceAnalytics)
+library(ggplot2)
+library(scales)
 library(stringr)
 
 # =========================================================
 # 1. CONFIGURATION & DATA LOADING
 # =========================================================
-# Load objects from previous steps
+# Load objects (Ensure these exist in your environment)
 # signals_long <- readRDS("signals_long.rds")
 # assets_wide  <- readRDS("assets_wide.rds") 
 
-# Benchmark (MSCI EM)
-BENCHMARK_TICKER <- "MIMUEMRN" 
+BENCHMARK_TICKER <- "MIMUEMRN" # iShares MSCI EM
 
 # Constraints
 MAX_SINGLE_ASSET   <- 0.20
 MAX_BOND_TOTAL     <- 0.40
 MAX_TOTAL_EXPOSURE <- 1.00 
 
-# Asset Class Definitions (Specific to your Universe)
+# Asset Class Definitions
 get_asset_class <- function(tickers) {
-  # List of Bond ETFs identified in your data
   bond_tickers <- c("JPEICORE", "GBIE1001", "BCEX6T", "BCEX4T", "IDCOT7", 
                     "BEIG1T", "LECPTREU", "IBOXXMJA")
-  
   ifelse(tickers %in% bond_tickers, "Bond", "Equity")
 }
 
 # =========================================================
 # 2. PREPARE DATA
 # =========================================================
-# Prepare Daily Prices & Returns
 daily_prices <- assets_wide %>% 
   arrange(date) %>%
-  select(date, everything()) 
+  distinct(date, .keep_all = TRUE) 
 
-# Create XTS object for backtesting
+# Create XTS
 daily_prices_xts <- daily_prices %>%
   select(-date) %>%
   xts(order.by = daily_prices$date)
 
-# Calculate Daily Returns
+# Calculate Returns
 daily_returns_xts <- Return.calculate(daily_prices_xts)
 
-# Prepare Benchmark (Clean NAs for chart alignment)
-bench_ret <- daily_returns_xts[, BENCHMARK_TICKER]
-bench_ret <- na.omit(bench_ret)
-colnames(bench_ret) <- "MSCI Emerging Markets (EUR)"
+# --- ROBUST BENCHMARK EXTRACTION ---
+# Treat benchmark separately to bridge gaps/holidays correctly.
+bench_prices_clean <- na.omit(daily_prices_xts[, BENCHMARK_TICKER])
+bench_ret <- Return.calculate(bench_prices_clean)
+colnames(bench_ret) <- "Benchmark"
 
 # =========================================================
 # 3. WEIGHT DETERMINATION (OPTION C LOGIC)
@@ -71,45 +74,41 @@ cat("Calculating Option C Weights (Breadth) for", length(rebalance_dates), "peri
 for (i in seq_along(rebalance_dates)) {
   curr_date <- rebalance_dates[i]
   
-  # 1. Filter: Select ALL assets with Expected Return > 0
-  # We do not limit to 'Top 5'. We trust the direction, not the magnitude.
+  # 1. Filter Candidates
+  # We select ALL positive signals.
   candidates <- signals_long %>%
     filter(date == curr_date) %>%
-    filter(expected_return > 0) %>%
-    mutate(asset_class = get_asset_class(asset))
+    mutate(asset_class = get_asset_class(asset)) %>%
+    # SAFETY: Treat NA/NaN as 0 (No Signal)
+    mutate(expected_return = ifelse(is.na(expected_return) | is.nan(expected_return), 0, expected_return)) %>%
+    filter(expected_return > 0)
   
-  # Initialize zero weights for all assets in universe
+  # Initialize zero weights
   universe_assets <- colnames(daily_prices_xts)
   w_vec <- setNames(rep(0, length(universe_assets)), universe_assets)
   
-  # If no assets have positive signal, we stay 100% Cash (w_vec remains 0)
   if (nrow(candidates) > 0) {
     
-    # 2. Base Weight Calculation: Equal Weight (1 / N)
+    # 2. Base Weight Calculation (Equal Weight)
     n_candidates <- nrow(candidates)
     base_weight  <- 1 / n_candidates
     
-    # Assign Base Weights to Candidates
-    # 3. Apply Constraint 1: Single Asset Cap (Max 20%)
-    # If 1/N is 33%, we cap at 20%. 
-    # If 1/N is 5%, we keep 5%.
+    # 3. Apply Single Asset Cap (Max 20%)
+    # If we have 2 assets, 1/N = 50%, capped at 20%.
     final_single_weight <- min(base_weight, MAX_SINGLE_ASSET)
     
-    # Temporary Weight Vector for Candidates
     candidate_weights <- rep(final_single_weight, n_candidates)
     names(candidate_weights) <- candidates$asset
     
-    # 4. Apply Constraint 2: Bond Cap (Max 40% Total)
+    # 4. Apply Bond Cap (Max 40% Total)
     bond_subset <- candidates %>% filter(asset_class == "Bond")
     
     if (nrow(bond_subset) > 0) {
       current_bond_total <- sum(candidate_weights[bond_subset$asset])
       
       if (current_bond_total > MAX_BOND_TOTAL) {
-        # Calculate Scaling Factor (e.g., 0.40 / 0.60 = 0.66)
+        # Scale down bonds proportionally
         scale_factor <- MAX_BOND_TOTAL / current_bond_total
-        
-        # Scale down ONLY the bonds
         candidate_weights[bond_subset$asset] <- candidate_weights[bond_subset$asset] * scale_factor
       }
     }
@@ -118,7 +117,6 @@ for (i in seq_along(rebalance_dates)) {
     w_vec[names(candidate_weights)] <- candidate_weights
   }
   
-  # Store weights
   weights_history[[as.character(curr_date)]] <- w_vec
 }
 
@@ -127,14 +125,10 @@ for (i in seq_along(rebalance_dates)) {
 # =========================================================
 all_dates <- index(daily_returns_xts)
 strat_returns <- numeric(length(all_dates))
-
-# Matrix to store daily weights for analysis
 weight_matrix <- matrix(0, nrow = length(all_dates), ncol = ncol(daily_returns_xts))
 colnames(weight_matrix) <- colnames(daily_returns_xts)
 
-# Helper variables
-asset_names <- colnames(daily_returns_xts)
-current_weights <- setNames(rep(0, length(asset_names)), asset_names)
+current_weights <- setNames(rep(0, ncol(daily_returns_xts)), colnames(daily_returns_xts))
 last_rebal_idx <- 0
 
 cat("Running Daily Simulation...\n")
@@ -142,113 +136,121 @@ cat("Running Daily Simulation...\n")
 for (d in 1:length(all_dates)) {
   today <- all_dates[d]
   
-  # Check for Rebalance (Trade on Day T+1 relative to Signal Date)
   valid_rebal_dates <- rebalance_dates[rebalance_dates < today]
   
   if (length(valid_rebal_dates) > 0) {
     latest_rebal <- max(valid_rebal_dates)
     
-    # If we crossed a new rebalance date, update target weights
     if (as.numeric(latest_rebal) != last_rebal_idx) {
       target_w <- weights_history[[as.character(latest_rebal)]]
-      
-      # Update Portfolio (Instant Rebalance Assumption)
       current_weights[] <- 0 
       current_weights[names(target_w)] <- target_w
       last_rebal_idx <- as.numeric(latest_rebal)
     }
   }
   
-  # Store Today's Allocation
   weight_matrix[d, ] <- current_weights
   
-  # Calculate Today's Return
-  # Logic: Sum(Asset_Return * Weight). 
-  # Note: If Sum(Weights) < 1.0, the remainder is implicitly Cash (0% return).
+  # Calc Daily Return
   day_rets <- daily_returns_xts[d, ]
-  day_rets[is.na(day_rets)] <- 0 # Handle missing data (assets not yet trading)
+  day_rets[is.na(day_rets)] <- 0 
   
   strat_returns[d] <- sum(day_rets * current_weights)
 }
 
-# Create Strategy XTS
 strat_xts <- xts(strat_returns, order.by = all_dates)
-colnames(strat_xts) <- "Strategy"
+colnames(strat_xts) <- "Regime_All"
 
 # =========================================================
-# 5. REPORTING & VISUALIZATION
+# 5. REPORTING: DYNAMIC START DATE (THE FIX)
 # =========================================================
 
-# 1. Sync Start Dates
-# Find the first date we actually traded
-first_trade_idx <- min(which(rowSums(weight_matrix) > 0))
-start_date <- all_dates[first_trade_idx]
+# 1. Merge Strategy & Benchmark (Outer Join)
+compare_xts_full <- merge(strat_xts, bench_ret, join = "outer")
+compare_xts_full[is.na(compare_xts_full)] <- 0
 
-cat(paste("Backtest Start Date:", start_date, "\n"))
+# 2. FIND ACTUAL START DATE (Skip Warm-up)
+non_zero_idx <- which(compare_xts_full[, "Regime_All"] != 0)
 
-# 2. Merge & Trim
-compare_xts_raw <- merge(strat_xts, bench_ret, join = "inner")
-compare_xts <- compare_xts_raw[paste0(start_date, "/")]
+if (length(non_zero_idx) > 0) {
+  start_index_num   <- non_zero_idx[1]
+  actual_start_date <- index(compare_xts_full)[start_index_num]
+} else {
+  actual_start_date <- first(index(compare_xts_full))
+  warning("Strategy is flat (0%) for the entire history!")
+}
 
-# 3. Performance Stats
-stats <- rbind(
-  table.AnnualizedReturns(compare_xts),
-  maxDrawdown(compare_xts)
-)
+cat(paste("Strategy Warm-up Complete. Actual Trading Starts:", actual_start_date, "\n"))
 
-cat("\n--- PERFORMANCE SUMMARY (All) ---\n")
-print(round(stats, 4))
+# 3. TRIM DATA to this Start Date
+compare_xts <- compare_xts_full[paste0(actual_start_date, "/")]
 
-# 4. Performance Chart
+# 4. Standard Chart (Linear)
 charts.PerformanceSummary(compare_xts, 
-                          main = "Regime Strategy - All Assets EW",
+                          main = "Regime All-Assets vs Benchmark",
                           colorset = c("darkblue", "gray"),
                           lwd = 2)
 
+# 5. Log-Scale Chart (ggplot)
+plot_data <- data.frame(date = index(compare_xts), coredata(compare_xts)) %>%
+  pivot_longer(cols = -date, names_to = "Series", values_to = "Daily_Return") %>%
+  arrange(Series, date) %>%
+  group_by(Series) %>%
+  mutate(Wealth_Index = cumprod(1 + Daily_Return)) %>%
+  ungroup()
+
+p_log <- ggplot(plot_data, aes(x = date, y = Wealth_Index, color = Series)) +
+  geom_line(linewidth = 0.8) +
+  scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+                labels = trans_format("log10", math_format(10^.x))) +
+  scale_color_manual(values = c("Regime_All" = "#003366", "Benchmark" = "#999999")) +
+  labs(title = "Regime All-Assets vs Benchmark (Log Scale)",
+       subtitle = paste("Actual Trading Start:", actual_start_date),
+       y = "Wealth Index (Log 10)", x = NULL, color = NULL) +
+  theme_minimal() +
+  theme(legend.position = "top", plot.title = element_text(face = "bold", size = 12))
+
+print(p_log)
+
+# 6. Calendar Table (Manual Aggregation Fix)
+monthly_stats <- apply.monthly(compare_xts, Return.cumulative)
+
+cat("\n--- CALENDAR RETURNS ---\n")
+print(table.CalendarReturns(monthly_stats))
+
+cat("\n--- PERFORMANCE SUMMARY ---\n")
+print(round(rbind(table.AnnualizedReturns(compare_xts),
+                  maxDrawdown(compare_xts)), 4))
 
 # =========================================================
-# 6. ALLOCATION ANALYSIS (FIXED)
+# 6. ALLOCATION CHART (SYNCHRONIZED)
 # =========================================================
-# Prepare Allocation Data for Plotting
+
+# 1. Trim Weights to match the SAME Start Date as the Chart
 weight_matrix_xts <- xts(weight_matrix, order.by = all_dates)
-weight_sync <- weight_matrix_xts[paste0(start_date, "/")]
+weight_matrix_sync <- weight_matrix_xts[paste0(actual_start_date, "/")]
 
-# Aggregate by Class
-ac_map <- get_asset_class(colnames(weight_sync))
-
-# FIX: Wrap rowSums in xts() to preserve the time index
-# We use 'na.rm=TRUE' just to be safe, though 0s should be fine.
-equity_alloc <- xts(rowSums(weight_sync[, ac_map == "Equity"], na.rm=TRUE), order.by = index(weight_sync))
-bond_alloc   <- xts(rowSums(weight_sync[, ac_map == "Bond"],   na.rm=TRUE), order.by = index(weight_sync))
-
-# Calculate Cash (Residual)
-# Since equity_alloc and bond_alloc are now xts, this math works correctly
+# 2. Aggregate
+ac_map <- get_asset_class(colnames(weight_matrix_sync))
+equity_alloc <- xts(rowSums(weight_matrix_sync[, ac_map == "Equity"], na.rm=TRUE), order.by = index(weight_matrix_sync))
+bond_alloc   <- xts(rowSums(weight_matrix_sync[, ac_map == "Bond"],   na.rm=TRUE), order.by = index(weight_matrix_sync))
 cash_alloc   <- 1 - (equity_alloc + bond_alloc)
 
-# Fix slight floating point errors (e.g. -0.0000001 becoming 0)
-cash_alloc[cash_alloc < 0] <- 0
+# Clean
+cash_alloc[cash_alloc < 0] <- 0 
 cash_alloc[cash_alloc > 1] <- 1
 
-# Merge the three XTS objects
+# 3. Plot
 alloc_df <- merge(equity_alloc, bond_alloc, cash_alloc)
 colnames(alloc_df) <- c("Equity", "Bond", "Cash")
 
-# Stacked Bar Chart (Monthly Snapshot)
-# We use 'endpoints' to pick the last day of every month to make the chart readable
 chart.StackedBar(alloc_df[endpoints(alloc_df, "months")], 
-                 main = "Portfolio Allocation Over Time",
+                 main = "Portfolio Allocation (Option C - Breadth)",
                  colorset = c("darkgreen", "orange", "lightgray"),
-                 ylab = "Exposure", 
+                 ylab = "Allocation", 
                  ylim = c(0, 1.0),
                  border=NA)
 
-# Current Portfolio Snapshot
-cat("\n--- LATEST PORTFOLIO ALLOCATION ---\n")
-latest_w <- coredata(weight_sync)[nrow(weight_sync), ]
-active_pos <- latest_w[latest_w > 0.001] # Filter small dust
-print(round(active_pos, 3))
-
-cat("\nTotal Exposure:", sum(active_pos), "\n")
-# We calculate class sums manually for the print output
-cat("Bond Exposure: ", sum(latest_w[ac_map == "Bond"]), "\n")
-cat("Cash Exposure: ", 1 - sum(active_pos), "\n")
+cat("\n--- LATEST ALLOCATION ---\n")
+latest_w <- coredata(weight_matrix_sync)[nrow(weight_matrix_sync), ]
+print(round(latest_w[latest_w > 0.001], 3))

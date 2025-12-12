@@ -155,7 +155,7 @@ for (d in 1:length(all_dates)) {
 }
 
 strat_xts <- xts(strat_returns, order.by = all_dates)
-colnames(strat_xts) <- "Regime.Strategy"
+colnames(strat_xts) <- "Regime.Top5"
 
 # =========================================================
 # 5. REPORTING: DYNAMIC START DATE (THE FIX)
@@ -167,7 +167,7 @@ compare_xts_full[is.na(compare_xts_full)] <- 0
 
 # 2. FIND ACTUAL START DATE (Skip the Flat/Warm-up Period)
 # We find the first day the strategy return is NOT zero (either profit or loss).
-non_zero_idx <- which(compare_xts_full[, "Regime.Strategy"] != 0)
+non_zero_idx <- which(compare_xts_full[, "Regime.Top5"] != 0)
 
 if (length(non_zero_idx) > 0) {
   # Start exactly at the first trade
@@ -186,7 +186,7 @@ compare_xts <- compare_xts_full[paste0(actual_start_date, "/")]
 
 # 4. Standard Chart
 charts.PerformanceSummary(compare_xts, 
-                          main = "Regime Strategy vs Benchmark (Synchronized)",
+                          main = "Regime Top 5 vs Benchmark",
                           colorset = c("darkblue", "gray"),
                           lwd = 2)
 
@@ -199,13 +199,13 @@ plot_data <- data.frame(date = index(compare_xts), coredata(compare_xts)) %>%
   ungroup()
 
 p_log <- ggplot(plot_data, aes(x = date, y = Wealth_Index, color = Series)) +
-  geom_line(linewidth = 0.8) +
+  geom_line(linewidth = 0.6) +
   scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
                 labels = trans_format("log10", math_format(10^.x))) +
-  scale_color_manual(values = c("Regime.Strategy" = "#003366", "Benchmark" = "#999999")) +
+  scale_color_manual(values = c("Regime.Top5" = "#003366", "Benchmark" = "#999999")) +
   labs(title = "Regime Strategy vs Benchmark (Log Scale)",
        subtitle = paste("Actual Trading Start:", actual_start_date),
-       y = "Wealth Index (Log 10)", x = NULL, color = NULL) +
+       y = NULL, x = NULL, color = NULL) +
   theme_minimal() +
   theme(legend.position = "top", plot.title = element_text(face = "bold", size = 12))
 
@@ -244,8 +244,9 @@ alloc_df <- merge(equity_alloc, bond_alloc, cash_alloc)
 colnames(alloc_df) <- c("Equity", "Bond", "Cash")
 
 chart.StackedBar(alloc_df[endpoints(alloc_df, "months")], 
-                 main = "Portfolio Allocation (Synchronized)",
-                 colorset = c("darkgreen", "orange", "lightgray"),
+                 main = "Portfolio Allocation",
+                 colorset = c("#003f5c", "#ffa600", "#bc5090"),
                  ylab = "Allocation", 
                  ylim = c(0, 1.0),
                  border=NA)
+

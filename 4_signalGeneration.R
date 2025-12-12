@@ -50,35 +50,29 @@ asset_monthly_returns <- assets_long %>%
 # 2. Lookup the 'fwd_ret_1m' for those neighbor dates.
 # 3. Average them to get the Expected Return.
 
+# =========================================================
+# MODIFIED SIGNAL GENERATION (With Minimum N Check)
+# =========================================================
+
+# Add this constant at the top of Script 4
+MIN_NEIGHBORS_REQUIRED <- 6  # <--- Adjust this (3 to 5 is best)
+
 generate_signals <- function(regime_dist_df, asset_ret_df, percentile) {
   
-  # Get unique analysis dates from the regime output
-  # Filter only dates where we actually have asset data (post-2009)
   valid_dates <- unique(regime_dist_df$Analysis_Date)
   min_asset_date <- min(asset_ret_df$month_date)
-  
-  # Only generate signals if we are at least past the start of asset data
   valid_dates <- valid_dates[valid_dates >= min_asset_date]
   
   results_list <- list()
   
-  cat("Generating Signals for", length(valid_dates), "months...\n")
+  cat("Generating Signals with Min Neighbor Constraint...\n")
   
   for (i in seq_along(valid_dates)) {
     curr_date <- valid_dates[i]
     
-    # 1. Get Neighbors for this date
-    # We first determine how many neighbors constitute the top X% 
-    # based on the history available AT THAT MOMENT.
-    
-    current_regimes <- regime_dist_df %>%
-      filter(Analysis_Date == curr_date)
-    
-    # Number of historical months available so far
+    # 1. Get Top Neighbors
+    current_regimes <- regime_dist_df %>% filter(Analysis_Date == curr_date)
     n_history <- nrow(current_regimes)
-    
-    # Select Top N (Top 20% closest)
-    # Paper: "Select the 15% most similar months" [cite: 360]
     n_select <- ceiling(n_history * percentile)
     
     top_neighbors <- current_regimes %>%
@@ -86,23 +80,20 @@ generate_signals <- function(regime_dist_df, asset_ret_df, percentile) {
       head(n_select) %>%
       pull(Neighbor_Date)
     
-    # 2. Retrieve Asset Returns for these Neighbors
-    # This automatically handles the "Data starts in 2009" issue.
-    # If a neighbor is 2005, it won't be found in 'asset_ret_df', 
-    # so it won't contribute to the mean.
-    
+    # 2. Calculate Signals with "Safety Filter"
     neighbor_returns <- asset_ret_df %>%
       filter(month_date %in% top_neighbors) %>%
       group_by(asset) %>%
       summarise(
-        # The Core Signal: Average return in similar regimes
-        expected_return = mean(fwd_ret_1m, na.rm = TRUE),
+        neighbors_found = n(), # Count matches BEFORE calculating mean
         
-        # Diagnostics: How many neighbors actually had data?
-        neighbors_found = n(), 
+        # --- THE FIX ---
+        # If we have fewer than X neighbors, force the Signal to 0.
+        expected_return = if (n() < MIN_NEIGHBORS_REQUIRED) 0 else mean(fwd_ret_1m, na.rm = TRUE),
         
-        # Risk Metric: Consistency (Win Rate of the neighbors)
-        win_rate = sum(fwd_ret_1m > 0) / n(),
+        win_rate = if (n() < MIN_NEIGHBORS_REQUIRED) 0 else sum(fwd_ret_1m > 0) / n(),
+        # ---------------
+        
         .groups = "drop"
       ) %>%
       mutate(date = curr_date)
@@ -149,3 +140,4 @@ signals_long %>%
 # Save for Script 5
 # saveRDS(signals_long, "signals_long.rds")
 # saveRDS(asset_monthly_returns, "asset_monthly_returns.rds")
+

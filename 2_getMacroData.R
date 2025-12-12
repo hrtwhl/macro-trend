@@ -20,12 +20,18 @@ source("APIKey.R")
 fred_series <- c(
 
   #usd_em_index      = "DTWEXEMEGS",
-  usd_eur_rate      = "DEXUSEU",
+  #usd_eur_rate      = "DEXUSEU", 
+  dollar_index      = "NBUSBIS",
   term_spread_10y3m = "T10Y3M",
-  yield_10y         = "DGS10",
-  cpi_headline      = "CPIAUCSL",
-  vix_index         = "VIXCLS",
-  china_cli         = "CHNLOLITOAASTSAM"
+  yield_10y         = "DGS3MO",
+  #yield_10y         = "DGS10",
+  #yield_3m          = "DGS3MO",
+
+  #cpi_headline      = "CPIAUCSL",
+  vix_index         = "VIXCLS"
+  #china_cli         = "CHNLOLITOAASTSAM"
+  #copper            = "PCOPPUSDM",
+  #oil               = "POILWTIUSDM"
 )
 
 
@@ -48,8 +54,8 @@ get_fred_data <- function(named_series, start_date = "2000-01-01", freq = NULL) 
 # 5. Global Growth (Man Group Theme)
 # 6. Inflation Shock (Man Group Theme)
 yf_futures <- tibble::tibble(
-  yf = "^SPX",
-  series = "SPX"  # Clean names for the series
+  yf = c("^SPX", "CL=F", "HG=F"),
+  series = c("SPX", "oil", "copper")  # Clean names for the series
 )
 
 get_yahoo_close <- function(tickers_tbl) {
@@ -113,3 +119,5 @@ macro_wide <- macro_long %>%
 
 # Check
 cat("Lag applied. NAs removed. Start Date:", as.character(min(macro_wide$date)), "\n")
+
+View(macro_wide)

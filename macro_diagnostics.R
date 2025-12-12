@@ -2,7 +2,7 @@
 # SCRIPT 2b: MACRO DIAGNOSTICS (REPLICATING EXHIBITS 5 & 6)
 # =========================================================
 # Purpose: 
-# 1. Transform raw macro data to match the Paper's input (12m Change -> Z-Score).
+# 1. Transform raw macro data (12m Change -> Standard Rolling Z-Score).
 # 2. Replicate Exhibit 5 (Autocorrelations & Descriptive Stats).
 # 3. Replicate Exhibit 6 (Correlation Heatmap).
 
@@ -12,6 +12,7 @@ library(tidyr)
 library(lubridate)
 library(ggplot2)
 library(zoo) # For rolling functions
+library(purrr)
 
 # =========================================================
 # 1. PREPARE DATA (Monthly + Transformations)
@@ -24,46 +25,83 @@ macro_monthly <- macro_wide %>%
   summarise(across(where(is.numeric), ~ last(na.omit(.))), .groups = "drop") %>%
   arrange(month_date)
 
-# B. Calculate 12-Month Changes (The "Regime" Transformation)
-# We must apply the exact logic from Script 3 to analyze the actual model inputs.
-macro_trans <- macro_monthly %>%
-  mutate(
-    # Log Returns for Levels (Prices/Indices)
-    SPX_chg         = log(SPX / lag(SPX, 12)),
-    cpi_chg         = log(cpi_headline / lag(cpi_headline, 12)),
-    usd_eur_chg     = log(usd_eur_rate / lag(usd_eur_rate, 12)),
-    
-    # Absolute Change for Rates/Spreads/Indices
-    china_cli_chg   = china_cli - lag(china_cli, 12),
-    spread_chg      = term_spread_10y3m - lag(term_spread_10y3m, 12),
-    yield_chg       = yield_10y - lag(yield_10y, 12),
-    vix_chg         = vix_index - lag(vix_index, 12)
-  ) %>%
-  select(month_date, ends_with("_chg")) %>%
-  drop_na() # Remove the first 12 months
+# B. DEFINE ROLLING Z-SCORE FUNCTION (Standard Z-Score)
+# Methodology:
+# 1. Calculate 12-month change.
+# 2. Calculate Rolling Mean AND Rolling SD (Min 3 years, Max 10 years).
+# 3. Compute Z = (Value - Rolling Mean) / Rolling SD.
+# 4. Winsorize at +/- 3.
 
-
-# C. Normalize (Paper Style: Scale by Volatility ONLY)
-# The paper says: "divide the one-year difference by the standard deviation" [Source: 195]
-# They do NOT subtract the mean, which preserves the positive drift of equities.
-
-paper_z_score <- function(x) { 
-  # We assume the standard deviation of the full sample for this diagnostic table
-  # (In the live model, it's rolling, but for this table, we just want to match the logic)
-  x / sd(x, na.rm=TRUE) 
+calculate_rolling_z_score <- function(raw_series, is_log_return = FALSE) {
+  
+  # 1. Calculate 12-month Change
+  d12 <- rep(NA, length(raw_series))
+  
+  if (length(raw_series) > 12) {
+    if (is_log_return) {
+      d12[13:length(raw_series)] <- diff(log(raw_series), lag = 12)
+    } else {
+      d12[13:length(raw_series)] <- diff(raw_series, lag = 12)
+    }
+  }
+  
+  # 2. Calculate Rolling Statistics (Min 3y / Max 10y)
+  n <- length(d12)
+  rolling_mean <- rep(NA, n)
+  rolling_sd   <- rep(NA, n)
+  
+  # Min 3 years (36 obs) of valid 12m diffs required
+  min_obs <- 36 
+  max_obs <- 120
+  
+  # Start calc at index where we have enough history (12 lags + 36 obs)
+  start_calc_index <- 12 + min_obs + 1
+  
+  if (n >= start_calc_index) {
+    for (i in start_calc_index:n) {
+      # Lookback window logic (Expanding then Rolling)
+      window_start <- max(13, i - max_obs + 1)
+      window_data  <- d12[window_start:i]
+      
+      # Calculate BOTH Mean and SD for standard Z-score
+      rolling_mean[i] <- mean(window_data, na.rm = TRUE)
+      rolling_sd[i]   <- sd(window_data, na.rm = TRUE)
+    }
+  }
+  
+  # 3. Compute Standard Z-Score: (X - Mean) / SD
+  score <- (d12 - rolling_mean) / rolling_sd
+  
+  # 4. Winsorize at +/- 3
+  final_score <- pmax(pmin(score, 3), -3)
+  
+  return(final_score)
 }
 
-macro_z_diag <- macro_trans %>%
-  mutate(across(ends_with("_chg"), paper_z_score))
-
-
+# C. Apply Transformation to All Variables
+macro_z_diag <- macro_monthly %>%
+  transmute(
+    month_date = month_date,
+    
+    # 1. Log Return Variables (Prices/Indices)
+    SPX_chg    = calculate_rolling_z_score(SPX, is_log_return = TRUE),
+    oil_chg    = calculate_rolling_z_score(oil, is_log_return = TRUE),
+    copper_chg = calculate_rolling_z_score(copper, is_log_return = TRUE),
+    dollar_chg = calculate_rolling_z_score(dollar_index, is_log_return = TRUE),
+    
+    # 2. Absolute Change Variables (Rates/Spreads)
+    spread_chg = calculate_rolling_z_score(term_spread_10y3m, is_log_return = FALSE),
+    yield_chg  = calculate_rolling_z_score(yield_10y, is_log_return = FALSE), 
+    vix_chg    = calculate_rolling_z_score(vix_index, is_log_return = FALSE)
+  ) %>%
+  drop_na() # Remove rows where the rolling window wasn't full enough yet
 
 # =========================================================
 # 2. REPLICATE EXHIBIT 5 (Descriptive Stats & Autocorr)
 # =========================================================
 
 calc_exhibit5_stats <- function(x) {
-  # Autocorrelations (handle short history if 10y is not avail)
+  # Autocorrelations
   acf_vals <- acf(x, plot = FALSE, lag.max = 120)$acf
   
   get_lag <- function(l) if(l < length(acf_vals)) round(acf_vals[l+1], 2) else NA
@@ -116,13 +154,10 @@ exhibit_6_plot <- ggplot(cor_melt, aes(Var1, Var2, fill = Correlation)) +
     panel.grid.major = element_blank(),
     panel.border = element_blank(),
     panel.background = element_blank(),
-    axis.ticks = element_blank(),
-    #legend.justification = c(1, 0),
-    #legend.position = c(0.6, 0.7),
-    #legend.direction = "horizontal"
+    axis.ticks = element_blank()
   ) +
   coord_fixed() +
-  labs(title = "Exhibit 6: Correlation of Economic State Variables",
-       subtitle = "Cross-correlations of 12-month changes (Z-scored)")
+  labs(title = "Correlation of Economic State Variables",
+       subtitle = "Standard Rolling Z-Scores")
 
 print(exhibit_6_plot)

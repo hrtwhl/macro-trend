@@ -43,7 +43,8 @@ WINSORIZE_LIMIT        <- 3   # Cap Z-scores at +/- 3 (Paper standard)
 macro_monthly_raw <- macro_wide %>%
   arrange(date) %>%
   tidyr::fill(all_of(SELECTED_VARS), .direction = "down") %>%
-  mutate(month_date = floor_date(date, "month")) %>%
+  #mutate(month_date = floor_date(date, "month")) %>%
+  mutate(month_date = ceiling_date(date, "month") - days(1)) %>% 
   group_by(month_date) %>%
   summarise(across(all_of(SELECTED_VARS), dplyr::last), .groups = "drop") %>%
   drop_na() %>%
@@ -60,15 +61,12 @@ macro_chg <- macro_monthly_raw %>%
   mutate(
     # Log Returns for Levels (Prices/Indices)
     SPX_chg      = log(SPX / lag(SPX, 12)),
-    #china_cli_chg= china_cli - lag(china_cli, 12), # CLI is an index around 100, absolute diff is standard
     oil_chg   = log(oil / lag(oil, 12)),
     copper_chg   = log(copper / lag(copper, 12)),
     dollar_chg   = log(dollar_index / lag(dollar_index, 12)),
-    #cpi_chg      = log(cpi_headline / lag(cpi_headline, 12)),
     
     # Absolute Change for Rates/Spreads
     spread_chg   = term_spread_10y3m - lag(term_spread_10y3m, 12),
-    
     yield_chg    = yield_10y - lag(yield_10y, 12),
     vix_chg      = vix_index - lag(vix_index, 12)
   ) %>%

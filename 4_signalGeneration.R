@@ -17,7 +17,7 @@ library(purrr)
 # =========================================================
 # Paper parameter: "We use the full history and pick the 15% most similar months" [cite: 360]
 # or "quintile 1" (20%)[cite: 480]. 
-SIMILARITY_PERCENTILE <- 0.20 
+SIMILARITY_PERCENTILE <- 0.20
 
 # =========================================================
 # 2. PREPARE ASSET RETURNS (TARGETS)
@@ -28,7 +28,8 @@ SIMILARITY_PERCENTILE <- 0.20
 # Ensure we are working with the 'assets_long' from Script 1
 # We aggregate to monthly if the data is daily
 asset_monthly_returns <- assets_long %>%
-  mutate(month_date = floor_date(date, "month")) %>%
+  #mutate(month_date = floor_date(date, "month")) %>%
+  mutate(month_date = ceiling_date(date, "month") - days(1)) %>%
   group_by(asset, month_date) %>%
   summarise(price = last(price), .groups = "drop") %>% # Get month-end price
   arrange(asset, month_date) %>%
@@ -40,6 +41,7 @@ asset_monthly_returns <- assets_long %>%
   ) %>%
   ungroup() %>%
   drop_na(fwd_ret_1m)
+
 
 # =========================================================
 # 3. SIGNAL CONSTRUCTION ENGINE
